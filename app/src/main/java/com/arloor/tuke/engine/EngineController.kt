@@ -3,6 +3,7 @@ package com.arloor.tuke.engine
 import android.content.Context
 import com.arloor.tuke.core.settings.SettingsStore
 import java.io.File
+import java.util.TimeZone
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -110,7 +111,19 @@ class EngineController(
             .put("baseURL", baseUrl)
             .put("internalAPIKey", internalKey)
             .put("runtimePath", runtimeFile.absolutePath)
+            .put("timezone", TimeZone.getDefault().id)
+            .put("proxyURL", currentProxyUrl())
         File(appContext.filesDir, "engine-config.json").writeText(json.toString())
+    }
+
+    private fun currentProxyUrl(): String {
+        val host = System.getProperty("https.proxyHost")?.trim().orEmpty()
+            .ifEmpty { System.getProperty("http.proxyHost")?.trim().orEmpty() }
+        val port = System.getProperty("https.proxyPort")?.toIntOrNull()
+            ?: System.getProperty("http.proxyPort")?.toIntOrNull()
+        if (host.isEmpty() || port == null || port !in 1..65535) return ""
+        val renderedHost = if (host.contains(':') && !host.startsWith('[')) "[$host]" else host
+        return "http://$renderedHost:$port"
     }
 
     private suspend fun pollRuntime() {

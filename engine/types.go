@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"time"
+	_ "time/tzdata"
 )
 
 const (
@@ -17,6 +18,8 @@ type config struct {
 	BaseURL        string `json:"baseURL"`
 	InternalAPIKey string `json:"internalAPIKey"`
 	RuntimePath    string `json:"runtimePath"`
+	Timezone       string `json:"timezone"`
+	ProxyURL       string `json:"proxyURL"`
 }
 
 type attachment struct {

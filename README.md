@@ -8,7 +8,7 @@
 - 自行配置 DeepSeek API Key
 - 图片以 Base64 随 `run_sse` 发送，保存在本机
 - 切到其他应用时，生成中的会话靠前台服务保活
-- harness 仅包含 DeepSeek Responses 流、会话与附件；不包含通用工具、技能、定时任务、飞书、遥测或远程分享
+- harness 仅包含 DeepSeek Responses 流、会话、附件、`current_time` 和受限的 `web_fetch`；不包含通用文件工具、技能、定时任务、飞书、遥测或远程分享
 
 ## 开发
 

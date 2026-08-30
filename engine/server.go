@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 )
 
@@ -70,6 +71,17 @@ func newEngineServer(cfg config) (*engineServer, error) {
 	}
 	provider, err := newDeepSeekProvider(cfg.APIKey, cfg.BaseURL)
 	if err != nil {
+		return nil, err
+	}
+	location := time.Local
+	if strings.TrimSpace(cfg.Timezone) != "" {
+		location, err = time.LoadLocation(strings.TrimSpace(cfg.Timezone))
+		if err != nil {
+			return nil, fmt.Errorf("设备时区无效: %w", err)
+		}
+	}
+	provider.configureLocalTools(location)
+	if err := provider.configureWebFetch(cfg.ProxyURL); err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(cfg.InternalAPIKey) == "" {
@@ -298,12 +310,8 @@ func (s *engineServer) runSSE(w http.ResponseWriter, r *http.Request) {
 
 func (s *engineServer) generate(ctx context.Context, sessionID string, turns []turn, model string, run *activeRun) {
 	responseID := randomID()
-	result, err := s.provider.stream(ctx, turns, model, func(delta providerDelta) {
-		id := delta.ResponseID
-		if id == "" {
-			id = responseID
-		}
-		run.append(event{ID: id, ResponseID: id, Author: "assistant", Partial: true, Timestamp: nowText(), Parts: []part{delta.Part}})
+	result, err := s.provider.stream(ctx, turns, model, sessionID, func(delta providerDelta) {
+		run.append(event{ID: responseID, ResponseID: responseID, InvocationID: responseID, Author: "assistant", Partial: true, Timestamp: nowText(), Parts: []part{delta.Part}})
 	})
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -313,17 +321,16 @@ func (s *engineServer) generate(ctx context.Context, sessionID string, turns []t
 		}
 		return
 	}
-	if result.ResponseID != "" {
-		responseID = result.ResponseID
+	parts := result.Parts
+	if len(parts) == 0 {
+		if result.Thinking != "" {
+			parts = append(parts, part{Type: "thinking", Text: result.Thinking})
+		}
+		if result.Text != "" {
+			parts = append(parts, part{Type: "text", Text: result.Text})
+		}
 	}
-	parts := []part{}
-	if result.Thinking != "" {
-		parts = append(parts, part{Type: "thinking", Text: result.Thinking})
-	}
-	if result.Text != "" {
-		parts = append(parts, part{Type: "text", Text: result.Text})
-	}
-	final := event{ID: responseID, ResponseID: responseID, Author: "assistant", Timestamp: nowText(), Parts: parts, Usage: &result.Usage}
+	final := event{ID: responseID, ResponseID: responseID, InvocationID: responseID, Author: "assistant", Timestamp: nowText(), Parts: parts, Usage: &result.Usage}
 	if err := s.store.finish(sessionID, final, result.Output); err != nil {
 		run.finish(err.Error())
 		return
