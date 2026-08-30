@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -30,7 +32,14 @@ func TestDeepSeekStreamAndReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := provider.stream(context.Background(), []turn{{Message: "你好", Images: []attachment{{Name: "a.png", MIMEType: "image/png", Data: "cG5n"}}}}, "deepseek", func(providerDelta) {})
+	result, err := provider.stream(context.Background(), []turn{{
+		Message: "你好",
+		Images:  []attachment{{Name: "a.png", MIMEType: "image/png", Data: "cG5n"}},
+		Files: []attachment{{
+			Name: "windows.xml", MIMEType: "text/xml",
+			Data: base64.StdEncoding.EncodeToString([]byte(`<window title="测试" />`)),
+		}},
+	}}, "deepseek", func(providerDelta) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,10 +54,23 @@ func TestDeepSeekStreamAndReplay(t *testing.T) {
 	if content[1].(map[string]any)["image_url"] != "data:image/png;base64,cG5n" {
 		t.Fatalf("unexpected image: %#v", content[1])
 	}
+	textFile := content[2].(map[string]any)
+	if textFile["type"] != "input_text" || !strings.Contains(textFile["text"].(string), `<window title="测试" />`) {
+		t.Fatalf("unexpected text file: %#v", textFile)
+	}
 }
 
 func TestDeepSeekBaseURLRejectsInsecureRemote(t *testing.T) {
 	if _, err := newDeepSeekProvider("secret", "http://example.com"); err == nil {
 		t.Fatal("expected insecure URL rejection")
+	}
+}
+
+func TestUserInputRejectsUnsupportedDocument(t *testing.T) {
+	_, err := userInput(turn{Files: []attachment{{
+		Name: "report.pdf", MIMEType: "application/pdf", Data: "cGRm",
+	}}})
+	if err == nil || !strings.Contains(err.Error(), "仅支持图片和 UTF-8 文本附件") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

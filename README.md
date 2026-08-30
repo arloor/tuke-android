@@ -1,12 +1,12 @@
 # Tuke Android
 
-本地嵌入式 AI 助手。仓库内的精简 Agent harness 跑在应用内部的独立 `:engine` 进程；UI 通过 `127.0.0.1` 访问仅供本应用使用的 `/api/chat/*`。
+本地嵌入式 AI 助手。仓库内的精简 Agent harness 作为应用主进程管理的独立 Go 子进程运行；UI 通过 `127.0.0.1` 访问仅供本应用使用的 `/api/chat/*`。
 
 ## 和 stock-android-native 的差别
 
 - 无登录、无托管后端、无 media-gateway
 - 自行配置 DeepSeek API Key
-- 图片/文件以 Base64 随 `run_sse` 发送，保存在本机
+- 图片以 Base64 随 `run_sse` 发送，保存在本机
 - 切到其他应用时，生成中的会话靠前台服务保活
 - harness 仅包含 DeepSeek Responses 流、会话与附件；不包含通用工具、技能、定时任务、飞书、遥测或远程分享
 

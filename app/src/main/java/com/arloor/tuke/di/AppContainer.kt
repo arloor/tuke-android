@@ -52,5 +52,5 @@ class AppContainer(context: Context) {
         endpoint = { engineController.endpoint() },
     )
 
-    val agentStreamKeepAlive = AgentStreamKeepAlive(appContext, engineController)
+    val agentStreamKeepAlive = AgentStreamKeepAlive(appContext)
 }

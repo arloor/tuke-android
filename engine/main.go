@@ -44,7 +44,7 @@ func main() {
 	}
 	server := &http.Server{Handler: engine.handler(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 90 * time.Second}
 	port := listener.Addr().(*net.TCPAddr).Port
-	if err := writeRuntime(cfg.RuntimePath, map[string]any{"status": "running", "port": port}); err != nil {
+	if err := writeRuntime(cfg.RuntimePath, map[string]any{"status": "running", "port": port, "pid": os.Getpid()}); err != nil {
 		_ = listener.Close()
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

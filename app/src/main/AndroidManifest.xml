@@ -63,9 +63,7 @@
         </receiver>
         <service
             android:name=".engine.TukeEngineService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:process=":engine" />
+            android:exported="false" />
         <service
             android:name=".core.agent.AgentStreamService"
             android:exported="false"

@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -28,52 +29,64 @@ class AgentStreamService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForegroundNotification()
+        if (!startForegroundNotification()) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         acquireWakeLock()
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        val lock = wakeLock
-        if (lock != null && lock.isHeld) {
-            runCatching { lock.release() }
-        }
-        wakeLock = null
+        releaseWakeLock()
         super.onDestroy()
     }
 
-    private fun startForegroundNotification() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "AI 助手后台生成",
-                    NotificationManager.IMPORTANCE_LOW,
-                ),
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "Foreground service timed out: type=$fgsType")
+        releaseWakeLock()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf(startId)
+    }
+
+    private fun startForegroundNotification(): Boolean {
+        return try {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(
+                    NotificationChannel(
+                        CHANNEL_ID,
+                        "AI 助手后台生成",
+                        NotificationManager.IMPORTANCE_LOW,
+                    ),
+                )
+            }
+            val contentIntent = PendingIntent.getActivity(
+                this,
+                0,
+                Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                },
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
+            val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(applicationInfo.icon)
+                .setContentTitle("AI 助手正在生成回答")
+                .setContentText("可切换应用，生成不会中断")
+                .setOngoing(true)
+                .setContentIntent(contentIntent)
+                .build()
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+            )
+            true
+        } catch (error: RuntimeException) {
+            Log.w(TAG, "Unable to promote stream service to foreground", error)
+            false
         }
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(applicationInfo.icon)
-            .setContentTitle("AI 助手正在生成回答")
-            .setContentText("可切换应用，生成不会中断")
-            .setOngoing(true)
-            .setContentIntent(contentIntent)
-            .build()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-        )
     }
 
     private fun acquireWakeLock() {
@@ -87,7 +100,16 @@ class AgentStreamService : Service() {
         }
     }
 
+    private fun releaseWakeLock() {
+        val lock = wakeLock
+        if (lock != null && lock.isHeld) {
+            runCatching { lock.release() }
+        }
+        wakeLock = null
+    }
+
     companion object {
+        private const val TAG = "AgentStreamService"
         private const val CHANNEL_ID = "agent_stream"
         private const val NOTIFICATION_ID = 1001
         private const val WAKE_LOCK_TAG = "tuke:agent_stream"
@@ -100,7 +122,7 @@ class AgentStreamService : Service() {
                     context,
                     Intent(context, AgentStreamService::class.java),
                 )
-            }
+            }.onFailure { Log.w(TAG, "Unable to start stream foreground service", it) }
         }
 
         fun stop(context: Context) {

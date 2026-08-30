@@ -2,6 +2,7 @@ package com.arloor.tuke.core.agent
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,9 +11,9 @@ class AgentModelsTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun `deepseek model supports images and workspace files`() {
+    fun `deepseek model supports images but not document files`() {
         assertTrue(agentModelSupportsImages(AGENT_MODEL_DEEPSEEK))
-        assertTrue(agentModelSupportsFiles(AGENT_MODEL_DEEPSEEK))
+        assertFalse(agentModelSupportsFiles(AGENT_MODEL_DEEPSEEK))
         assertEquals("深度推理，支持图像理解", agentModelSubtitle(AGENT_MODEL_DEEPSEEK))
     }
 
@@ -126,7 +127,7 @@ class AgentModelsTest {
 
     @Test
     fun `document mime type is inferred from supported extension`() {
-        assertEquals("application/pdf", agentDocumentMimeType("annual-report.PDF"))
+        assertNull(agentDocumentMimeType("annual-report.PDF"))
         assertEquals("text/markdown", agentDocumentMimeType("notes.md"))
         assertEquals("text/plain", agentDocumentMimeType("main.kt"))
         assertNull(agentDocumentMimeType("archive.zip"))

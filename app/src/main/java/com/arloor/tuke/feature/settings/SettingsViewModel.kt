@@ -25,7 +25,7 @@ data class SettingsUiState(
 
 class SettingsViewModel(
     private val settingsStore: SettingsStore,
-    engineController: EngineController,
+    private val engineController: EngineController,
     private val appUpdateChecker: AppUpdateChecker,
 ) : ViewModel() {
     private val current = settingsStore.current()
@@ -64,6 +64,7 @@ class SettingsViewModel(
     fun save() {
         val state = _uiState.value
         settingsStore.saveApiKey(state.apiKey, state.baseUrl)
+        engineController.ensureStarted()
         _uiState.update { it.copy(saved = true) }
     }
 

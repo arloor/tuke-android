@@ -42,11 +42,23 @@ class EngineController(
     }
 
     fun ensureStarted() {
-        if (_state.value.ready || _state.value.starting) return
+        val snapshot = _state.value
+        if (snapshot.starting || (snapshot.ready && runtimeProcessIsAlive())) return
         val settings = settingsStore.current()
         if (settings.deepSeekApiKey.isNotBlank()) {
+            _state.value = EngineState(hasApiKey = true, starting = true)
             scope.launch { start(settings.deepSeekApiKey, settings.deepSeekBaseUrl, settings.internalApiKey) }
         }
+    }
+
+    private fun runtimeProcessIsAlive(): Boolean {
+        val pid = runCatching { JSONObject(runtimeFile.readText()).optInt("pid", -1) }.getOrDefault(-1)
+        if (pid <= 0) return false
+        val expectedBinary = File(appContext.applicationInfo.nativeLibraryDir, "libtuke.so").absolutePath
+        val actualBinary = runCatching {
+            File("/proc/$pid/cmdline").readText().substringBefore('\u0000')
+        }.getOrNull()
+        return actualBinary == expectedBinary
     }
 
     fun endpoint(): EngineEndpoint? {
@@ -56,10 +68,6 @@ class EngineController(
         if (!snapshot.ready || token.isBlank()) return null
         return EngineEndpoint(baseUrl = base, token = token)
     }
-
-    fun notifyRunBegin() = TukeEngineService.runBegin(appContext)
-
-    fun notifyRunEnd() = TukeEngineService.runEnd(appContext)
 
     private fun start(apiKey: String, baseUrl: String, internalKey: String) {
         _state.value = EngineState(hasApiKey = true, starting = true, error = null)

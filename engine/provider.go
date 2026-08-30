@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const mobileInstruction = `你是运行在 Android 应用中的 AI 助手。请直接解决用户的问题，使用清晰、准确、适合手机阅读的中文；用户使用其他语言时跟随用户。需要最新信息时可使用联网搜索。不要声称执行了当前对话未提供的操作。`
@@ -58,7 +60,7 @@ func newDeepSeekProvider(apiKey, rawBaseURL string) (*deepSeekProvider, error) {
 	return &deepSeekProvider{apiKey: strings.TrimSpace(apiKey), baseURL: strings.TrimRight(base, "/"), client: client}, nil
 }
 
-func userInput(t turn) map[string]any {
+func userInput(t turn) (map[string]any, error) {
 	content := make([]map[string]any, 0, 1+len(t.Images)+len(t.Files))
 	if t.Message != "" {
 		content = append(content, map[string]any{"type": "input_text", "text": t.Message})
@@ -71,22 +73,44 @@ func userInput(t turn) map[string]any {
 		content = append(content, map[string]any{"type": "input_image", "image_url": imageURL, "detail": "high"})
 	}
 	for _, file := range t.Files {
-		item := map[string]any{"type": "input_file", "filename": file.Name}
-		if file.Data != "" {
-			item["file_data"] = "data:" + file.MIMEType + ";base64," + file.Data
-		} else {
-			item["file_url"] = file.URL
+		if file.Data == "" || !textAttachmentMIME(file.MIMEType) {
+			return nil, fmt.Errorf("DeepSeek 不支持附件 %q 的文件格式，仅支持图片和 UTF-8 文本附件", file.Name)
 		}
-		content = append(content, item)
+		decoded, err := base64.StdEncoding.DecodeString(file.Data)
+		if err != nil {
+			return nil, fmt.Errorf("附件 %q 数据无效: %w", file.Name, err)
+		}
+		if !utf8.Valid(decoded) {
+			return nil, fmt.Errorf("附件 %q 不是有效的 UTF-8 文本", file.Name)
+		}
+		content = append(content, map[string]any{
+			"type": "input_text",
+			"text": fmt.Sprintf(
+				"用户上传了文本附件 %q（MIME: %s）。以下是文件完整内容：\n\n%s",
+				file.Name,
+				file.MIMEType,
+				string(decoded),
+			),
+		})
 	}
-	return map[string]any{"type": "message", "role": "user", "content": content}
+	return map[string]any{"type": "message", "role": "user", "content": content}, nil
+}
+
+func textAttachmentMIME(mimeType string) bool {
+	value := strings.ToLower(strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0]))
+	return strings.HasPrefix(value, "text/") || value == "application/json" || value == "application/xml" ||
+		value == "application/yaml" || value == "application/x-yaml"
 }
 
 func (p *deepSeekProvider) stream(ctx context.Context, turns []turn, model string, onDelta func(providerDelta)) (providerResult, error) {
 	input := make([]any, 0, len(turns)*3)
 	hasImage := false
 	for _, value := range turns {
-		input = append(input, userInput(value))
+		user, err := userInput(value)
+		if err != nil {
+			return providerResult{}, err
+		}
+		input = append(input, user)
 		if len(value.Images) > 0 {
 			hasImage = true
 		}

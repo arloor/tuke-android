@@ -38,8 +38,7 @@ data class AgentSettings(
 fun agentModelSupportsImages(model: String): Boolean =
     model == AGENT_MODEL_DEEPSEEK
 
-fun agentModelSupportsFiles(model: String): Boolean =
-    model == AGENT_MODEL_DEEPSEEK
+fun agentModelSupportsFiles(@Suppress("UNUSED_PARAMETER") model: String): Boolean = false
 
 fun agentImageMimeType(name: String, declaredMimeType: String?): String? {
     val declared = declaredMimeType?.trim()?.lowercase().orEmpty()
@@ -216,7 +215,6 @@ data class AgentFileInput(
 )
 
 fun agentDocumentMimeType(name: String): String? = when (name.substringAfterLast('.', "").lowercase()) {
-    "pdf" -> "application/pdf"
     "md", "markdown" -> "text/markdown"
     "csv" -> "text/csv"
     "tsv" -> "text/tsv"
