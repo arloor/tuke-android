@@ -13,7 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 class EngineController(
@@ -66,6 +68,21 @@ class EngineController(
         val base = snapshot.baseUrl ?: return null
         val token = settingsStore.current().internalApiKey
         if (!snapshot.ready || token.isBlank()) return null
+        return EngineEndpoint(baseUrl = base, token = token)
+    }
+
+    suspend fun awaitEndpoint(): EngineEndpoint {
+        ensureStarted()
+        val snapshot = withTimeoutOrNull(30_000) {
+            state.first { value ->
+                value.ready || (!value.starting && (value.error != null || !value.hasApiKey))
+            }
+        } ?: throw IllegalStateException("本地引擎启动超时")
+        val base = snapshot.baseUrl
+        val token = settingsStore.current().internalApiKey
+        if (!snapshot.ready || base == null || token.isBlank()) {
+            throw IllegalStateException(snapshot.error ?: "本地引擎启动失败")
+        }
         return EngineEndpoint(baseUrl = base, token = token)
     }
 

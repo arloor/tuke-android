@@ -197,6 +197,7 @@ fun RequireAuth(
     content: @Composable () -> Unit,
 ) {
     when {
+        isLoggedIn -> content()
         isRestoring -> {
             Column(
                 modifier = Modifier
@@ -217,6 +218,5 @@ fun RequireAuth(
                 loginContent()
             }
         }
-        else -> content()
     }
 }

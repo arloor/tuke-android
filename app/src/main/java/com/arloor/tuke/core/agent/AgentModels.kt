@@ -1,6 +1,7 @@
 package com.arloor.tuke.core.agent
 
 import com.arloor.tuke.R
+import java.util.Base64
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -50,6 +51,18 @@ fun agentImageMimeType(name: String, declaredMimeType: String?): String? {
         "gif" -> "image/gif"
         else -> null
     }
+}
+
+/** Coil 2 对 data URI 的支持不稳定，预览前将 base64 图片还原成字节模型。 */
+internal fun decodeAgentImageDataUri(value: String): ByteArray? {
+    if (!value.startsWith("data:image/", ignoreCase = true)) return null
+    val separator = value.indexOf(',')
+    if (separator <= 0 || !value.substring(0, separator).endsWith(";base64", ignoreCase = true)) {
+        return null
+    }
+    val encoded = value.substring(separator + 1)
+    if (encoded.isEmpty()) return null
+    return runCatching { Base64.getDecoder().decode(encoded) }.getOrNull()
 }
 
 @Serializable

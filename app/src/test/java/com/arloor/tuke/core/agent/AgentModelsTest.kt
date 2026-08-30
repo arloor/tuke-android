@@ -1,6 +1,7 @@
 package com.arloor.tuke.core.agent
 
 import kotlinx.serialization.json.Json
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -8,6 +9,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentModelsTest {
+
+    @Test
+    fun `base64 image data uri is decoded for preview`() {
+        assertArrayEquals(
+            byteArrayOf(1, 2, 3),
+            decodeAgentImageDataUri("data:image/png;base64,AQID"),
+        )
+        assertNull(decodeAgentImageDataUri("https://example.com/image.png"))
+        assertNull(decodeAgentImageDataUri("data:image/png,not-base64"))
+    }
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test

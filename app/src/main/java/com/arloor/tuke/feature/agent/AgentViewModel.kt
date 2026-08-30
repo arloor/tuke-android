@@ -583,8 +583,10 @@ class AgentViewModel(
         val key = activeConversationKey
         val selectedModel = state.selectedModel
         val view = conversationStore.get(key)
+        val engineState = engineController.state.value
         if ((message.isEmpty() && images.isEmpty() && files.isEmpty()) ||
-            state.conversationLoading || state.imageUploadsInProgress > 0 || !isReady()) return
+            state.conversationLoading || state.imageUploadsInProgress > 0 ||
+            (!engineState.ready && (!engineState.starting || !engineState.hasApiKey))) return
         if (files.isNotEmpty() && !agentModelSupportsFiles(selectedModel)) {
             _uiState.update { it.copy(imageUploadError = "当前模型仅支持上传图片。") }
             return
@@ -1381,6 +1383,18 @@ internal fun mergeIncomingEvent(
     val duplicateIndex = currentEvents.indexOfFirst { it.id != null && it.id == incoming.id }
     if (duplicateIndex >= 0) {
         val current = currentEvents[duplicateIndex]
+        if (current == incoming) return currentEvents
+        if (current.partial && incoming.partial) {
+            return currentEvents.toMutableList().also {
+                it[duplicateIndex] = current.copy(
+                    parts = mergeParts(current.parts, incoming.parts),
+                    timestamp = incoming.timestamp ?: current.timestamp,
+                    usage = incoming.usage ?: current.usage,
+                    error = incoming.error ?: current.error,
+                    local = false,
+                )
+            }
+        }
         if (current.partial && !incoming.partial) {
             return currentEvents.toMutableList().also {
                 it[duplicateIndex] = completeResponseEvent(current, incoming)

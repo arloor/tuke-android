@@ -49,7 +49,7 @@ class AppContainer(context: Context) {
     val agentRepository = AgentRepository(
         httpClient = agentHttpClient,
         json = json,
-        endpoint = { engineController.endpoint() },
+        endpoint = { engineController.awaitEndpoint() },
     )
 
     val agentStreamKeepAlive = AgentStreamKeepAlive(appContext)

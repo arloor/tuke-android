@@ -30,10 +30,14 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class AgentRepository(
     httpClient: OkHttpClient,
     private val json: Json,
-    private val endpoint: () -> EngineEndpoint?,
+    private val endpoint: suspend () -> EngineEndpoint,
 ) {
-    private fun baseUrl(): String {
-        return endpoint()?.baseUrl ?: throw ApiException("本地引擎尚未就绪")
+    private suspend fun baseUrl(): String {
+        return try {
+            endpoint().baseUrl
+        } catch (error: IllegalStateException) {
+            throw ApiException(error.message ?: "本地引擎启动失败", error)
+        }
     }
 
     private val httpClient = httpClient.newBuilder()

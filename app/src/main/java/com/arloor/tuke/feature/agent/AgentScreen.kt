@@ -163,6 +163,7 @@ import com.arloor.tuke.core.agent.agentHostedToolStatusTerminal
 import com.arloor.tuke.core.agent.agentModelSupportsImages
 import com.arloor.tuke.core.agent.agentModelSupportsFiles
 import com.arloor.tuke.core.agent.agentImageMimeType
+import com.arloor.tuke.core.agent.decodeAgentImageDataUri
 import com.arloor.tuke.core.agent.ChatSession
 import com.arloor.tuke.core.agent.agentModelIcon
 import com.arloor.tuke.core.agent.agentModelLabel
@@ -325,7 +326,7 @@ fun AgentScreen(
     }
 
     RequireAuth(
-        isLoggedIn = engineState.ready,
+        isLoggedIn = engineState.ready || (engineState.hasApiKey && engineState.starting),
         isRestoring = engineState.starting,
         loginContent = {
             EngineSetupCard(
@@ -364,6 +365,7 @@ fun AgentScreen(
         ) {
             AgentChatContent(
                 uiState = uiState,
+                engineStarting = engineState.starting,
                 onOpenDrawer = { scope.launch { drawerState.open() } },
                 onNewChat = viewModel::startNewConversation,
                 onSend = viewModel::send,
@@ -781,6 +783,7 @@ private fun SessionRow(
 @Composable
 private fun AgentChatContent(
     uiState: AgentUiState,
+    engineStarting: Boolean,
     onOpenDrawer: () -> Unit,
     onNewChat: () -> Unit,
     onSend: (String) -> Unit,
@@ -1034,6 +1037,14 @@ private fun AgentChatContent(
                 }
             }
 
+        }
+
+        if (engineStarting) {
+            NoticeBanner(
+                text = "本地引擎启动中，当前请求正在等待引擎就绪。",
+                tone = BannerTone.Info,
+                modifier = Modifier.padding(horizontal = PageHorizontalPadding),
+            )
         }
 
         if (!uiState.streamError.isNullOrBlank()) {
@@ -1896,10 +1907,9 @@ private fun StableUrlImage(
 ) {
 	val context = LocalContext.current
 	val request = remember(url) {
+		val model = decodeAgentImageDataUri(url) ?: url
 		ImageRequest.Builder(context)
-			.data(url)
-			.memoryCacheKey(url)
-			.diskCacheKey(url)
+			.data(model)
 			.crossfade(true)
 			.build()
 	}

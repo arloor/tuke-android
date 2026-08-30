@@ -12,6 +12,27 @@ import org.junit.Test
  */
 class AgentEventMergeTest {
 
+    @Test
+    fun `partial deltas with the same event id are merged`() {
+        val first = assistantEvent(
+            id = "response-1",
+            responseId = "response-1",
+            partial = true,
+            parts = listOf(AgentPart(type = "text", text = "流")),
+        )
+        val second = assistantEvent(
+            id = "response-1",
+            responseId = "response-1",
+            partial = true,
+            parts = listOf(AgentPart(type = "text", text = "式")),
+        )
+
+        val merged = mergeIncomingEvent(listOf(first), second).single()
+
+        assertTrue(merged.partial)
+        assertEquals("流式", merged.text)
+    }
+
     private fun assistantEvent(
         id: String,
         responseId: String? = null,
