@@ -1,0 +1,17 @@
+build/
+app/build/
+app/src/main/jniLibs/
+.gradle/
+.idea/
+.debug/
+*.iml
+local.properties
+keystore.properties
+*.jks
+*.keystore
+!debug.keystore
+engine/tuke-android
+engine/*.exe
+.DS_Store
+Thumbs.db
+_*.py

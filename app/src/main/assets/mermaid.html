@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=3">
+    <meta http-equiv="Content-Security-Policy"
+          content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:">
+    <style>
+        html, body {
+            margin: 0;
+            min-height: 1px;
+            background: transparent;
+            color: transparent;
+            font-family: sans-serif;
+        }
+        body { overflow: auto; }
+        #diagram {
+            box-sizing: border-box;
+            min-width: 100%;
+            padding: 16px;
+        }
+        #diagram svg {
+            display: block;
+            height: auto;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+<div id="diagram"></div>
+<script src="mermaid.min.js"></script>
+<script>
+    (() => {
+        const diagram = document.getElementById("diagram");
+        let generation = 0;
+
+        const reportHeight = () => {
+            const height = Math.max(1, Math.ceil(document.documentElement.scrollHeight));
+            window.AndroidMermaid.onHeight(height);
+        };
+
+        window.renderMermaid = async (source, darkTheme) => {
+            const currentGeneration = ++generation;
+            diagram.replaceChildren();
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    securityLevel: "strict",
+                    suppressErrorRendering: true,
+                    theme: "base",
+                    themeVariables: darkTheme ? {
+                        primaryColor: "#322e45",
+                        primaryTextColor: "#f1edf9",
+                        primaryBorderColor: "#a99ae8",
+                        lineColor: "#b5abd9",
+                        secondaryColor: "#292d39",
+                        tertiaryColor: "#242732",
+                        background: "#20232c",
+                        mainBkg: "#322e45",
+                        secondBkg: "#292d39",
+                        tertiaryBkg: "#242732",
+                        fontFamily: "sans-serif"
+                    } : {
+                        primaryColor: "#f3f0ff",
+                        primaryTextColor: "#34304a",
+                        primaryBorderColor: "#8a79df",
+                        lineColor: "#7568af",
+                        secondaryColor: "#eef1f8",
+                        tertiaryColor: "#faf9fe",
+                        background: "#ffffff",
+                        mainBkg: "#f3f0ff",
+                        secondBkg: "#eef1f8",
+                        tertiaryBkg: "#faf9fe",
+                        fontFamily: "sans-serif"
+                    },
+                    flowchart: { useMaxWidth: true, htmlLabels: true },
+                    sequence: { useMaxWidth: true }
+                });
+                await mermaid.parse(source);
+                const result = await mermaid.render(
+                    `android-mermaid-${currentGeneration}`,
+                    source
+                );
+                if (currentGeneration !== generation) return;
+                diagram.innerHTML = result.svg;
+                requestAnimationFrame(() => {
+                    reportHeight();
+                    window.AndroidMermaid.onRendered();
+                });
+            } catch (error) {
+                if (currentGeneration !== generation) return;
+                diagram.replaceChildren();
+                window.AndroidMermaid.onError(
+                    error instanceof Error ? error.message : String(error)
+                );
+            }
+        };
+
+        new ResizeObserver(reportHeight).observe(diagram);
+        window.AndroidMermaid.onReady();
+    })();
+</script>
+</body>
+</html>
