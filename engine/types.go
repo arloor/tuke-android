@@ -78,13 +78,21 @@ type turn struct {
 }
 
 type session struct {
-	ID        string  `json:"id"`
-	Title     string  `json:"title"`
-	UpdatedAt string  `json:"updatedAt"`
-	Model     string  `json:"model"`
-	Starred   bool    `json:"starred"`
-	Events    []event `json:"events"`
-	Turns     []turn  `json:"turns"`
+	ID         string           `json:"id"`
+	Title      string           `json:"title"`
+	UpdatedAt  string           `json:"updatedAt"`
+	Model      string           `json:"model"`
+	Starred    bool             `json:"starred"`
+	Events     []event          `json:"events"`
+	Turns      []turn           `json:"turns"`
+	Compaction *compactionState `json:"compaction,omitempty"`
+}
+
+// compactionState is a prompt overlay. Session events stay immutable; the
+// summary is not a chat bubble and does not advance UpdatedAt.
+type compactionState struct {
+	Summary        string `json:"summary,omitempty"`
+	CoveredEventID string `json:"coveredEventId,omitempty"`
 }
 
 type sessionSummary struct {

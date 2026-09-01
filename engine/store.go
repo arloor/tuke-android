@@ -102,6 +102,18 @@ func (s *sessionStore) addUser(id string, e event, t turn) (*session, error) {
 	return cloneSession(value), nil
 }
 
+func (s *sessionStore) saveCompaction(id string, state compactionState) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	value := s.sessions[id]
+	if value == nil {
+		return os.ErrNotExist
+	}
+	copied := state
+	value.Compaction = &copied
+	return s.saveLocked()
+}
+
 func (s *sessionStore) finish(id string, e event, output []json.RawMessage) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

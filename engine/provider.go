@@ -141,6 +141,34 @@ func textAttachmentMIME(mimeType string) bool {
 		value == "application/yaml" || value == "application/x-yaml"
 }
 
+func (p *deepSeekProvider) summarize(ctx context.Context, previous string, events []event) (string, error) {
+	transcript, err := renderTranscript(previous, events, maxToolContentChars, maxTranscriptChars)
+	if err != nil {
+		return "", err
+	}
+	prompt := strings.Replace(defaultSummarizerPrompt, conversationHistoryPlaceholder, transcript, 1)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(summarizerTimeoutSeconds)*time.Second)
+	defer cancel()
+	body := map[string]any{
+		"model": chatModel,
+		"input": []any{map[string]any{
+			"type": "message", "role": "user",
+			"content": []map[string]any{{"type": "input_text", "text": prompt}},
+		}},
+		"stream":    true,
+		"reasoning": map[string]any{"effort": "none"},
+	}
+	result, err := p.streamOnce(ctx, body, func(providerDelta) {})
+	if err != nil {
+		return "", err
+	}
+	text := strings.TrimSpace(result.Text)
+	if text == "" {
+		return "", errors.New("summarizer returned no usable content")
+	}
+	return text, nil
+}
+
 func (p *deepSeekProvider) stream(ctx context.Context, turns []turn, model, sessionID string, onDelta func(providerDelta)) (providerResult, error) {
 	input := make([]any, 0, len(turns)*3)
 	hasImage := false

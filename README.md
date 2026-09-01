@@ -8,11 +8,11 @@
 - 自行配置 DeepSeek API Key
 - 图片以 Base64 随 `run_sse` 发送，保存在本机
 - 切到其他应用时，生成中的会话靠前台服务保活
-- harness 仅包含 DeepSeek Responses 流、会话、附件、`current_time` 和受限的 `web_fetch`；不包含通用文件工具、技能、定时任务、飞书、遥测或远程分享
+- harness 仅包含 DeepSeek Responses 流、会话、附件、`current_time`、受限的 `web_fetch`，以及与 tuke ADK v2.3.0 相同策略的 tail-retention 上下文压缩；不包含通用文件工具、技能、定时任务、飞书、遥测或远程分享
 
 ## 开发
 
-1. 安装 JDK 17、Android SDK、Go 1.26
+1. 安装 JDK 17、Android SDK、Go 1.26.6 或更高版本
 2. 复制 `local.properties` 或确认 `sdk.dir`
 3. 构建引擎：`powershell -File scripts/build-engine.ps1`
 4. 安装：`.\gradlew.bat :app:installDebug`

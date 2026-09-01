@@ -57,11 +57,12 @@ func (r *activeRun) snapshot(cursor int) ([]event, int, bool, string, <-chan str
 }
 
 type engineServer struct {
-	key      string
-	store    *sessionStore
-	provider *deepSeekProvider
-	runsMu   sync.Mutex
-	runs     map[string]*activeRun
+	key        string
+	store      *sessionStore
+	provider   *deepSeekProvider
+	runsMu     sync.Mutex
+	runs       map[string]*activeRun
+	compaction compactionConfig
 }
 
 func newEngineServer(cfg config) (*engineServer, error) {
@@ -87,7 +88,10 @@ func newEngineServer(cfg config) (*engineServer, error) {
 	if strings.TrimSpace(cfg.InternalAPIKey) == "" {
 		return nil, errors.New("内部 API Key 不能为空")
 	}
-	return &engineServer{key: cfg.InternalAPIKey, store: store, provider: provider, runs: map[string]*activeRun{}}, nil
+	return &engineServer{
+		key: cfg.InternalAPIKey, store: store, provider: provider,
+		runs: map[string]*activeRun{}, compaction: defaultCompactionConfig(),
+	}, nil
 }
 
 func (s *engineServer) handler() http.Handler {
@@ -166,7 +170,7 @@ func (s *engineServer) sessionRoute(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "会话不存在")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"session": sessionSummary{value.ID, value.Title, value.UpdatedAt, value.Model, value.Starred}, "events": value.Events, "running": s.isRunning(id)})
+		writeJSON(w, http.StatusOK, map[string]any{"session": sessionSummary{value.ID, value.Title, value.UpdatedAt, value.Model, value.Starred}, "events": visibleEvents(value.Events), "running": s.isRunning(id)})
 	case http.MethodPatch:
 		var patch struct {
 			Title   *string `json:"title"`
@@ -309,6 +313,13 @@ func (s *engineServer) runSSE(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *engineServer) generate(ctx context.Context, sessionID string, turns []turn, model string, run *activeRun) {
+	prompt, compactErr := s.compactIfNeeded(ctx, sessionID)
+	if compactErr != nil {
+		fmt.Fprintf(os.Stderr, "context compaction failed: %v\n", compactErr)
+	}
+	if prompt != nil {
+		turns = prompt
+	}
 	responseID := randomID()
 	result, err := s.provider.stream(ctx, turns, model, sessionID, func(delta providerDelta) {
 		run.append(event{ID: responseID, ResponseID: responseID, InvocationID: responseID, Author: "assistant", Partial: true, Timestamp: nowText(), Parts: []part{delta.Part}})
